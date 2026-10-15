@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useCartStore } from '../../core/store/cartStore';
 import { Search, SlidersHorizontal, ShoppingCart, Star } from 'lucide-react';
 import keyboard from '../../assets/rgb клава.webp';
-import watch from '../../assets/watch.JPG';
+import watch from "../../assets/watch.jpg";
 import headphones from '../../assets/Наушники.jpg';
 import backpack from '../../assets/рюкзак кожанный.jpg';
 import bottle from '../../assets/супер шейкер.jpg';
