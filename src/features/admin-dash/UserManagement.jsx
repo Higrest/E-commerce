@@ -24,18 +24,22 @@ const normalizeUser = (user) => {
 };
 
 export const UserManagement = () => {
-  const [users, setUsers] = useState(mockUsersList);
+  const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const loadUsers = async () => {
+      setError('');
+
       try {
         const { data } = await apiClient.get('/admin/users');
         const backendUsers = Array.isArray(data) ? data : data?.users ?? data?.data ?? [];
         setUsers(backendUsers.map(normalizeUser));
       } catch {
-        setUsers(mockUsersList);
+        setUsers([]);
+        setError('Нет данных с сервера. Проверьте токен администратора и доступ к API.');
       }
     };
 
@@ -86,6 +90,12 @@ export const UserManagement = () => {
           Контроль учетных записей маркетплейса, выдача прав продавца и блокировка аккаунтов
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Панель фильтров и поиска */}
       <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-2xl border shadow-sm">

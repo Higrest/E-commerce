@@ -2,23 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Shield, Users, ShoppingBag, Check, X, AlertTriangle, ShieldAlert } from 'lucide-react';
 import apiClient from '../../core/api/apiClient';
 
-const mockAdminStats = {
-  totalPlatformRevenue: 148900000,
-  totalSellers: 34,
-  totalUsers: 1140,
-  pendingVerifications: 3
+const emptyStats = {
+  totalPlatformRevenue: 0,
+  totalSellers: 0,
+  totalUsers: 0,
+  pendingVerifications: 0,
 };
-
-const fallbackPendingSellers = [
-  { id: 'sel_1', store_name: 'TechWave Uzbekistan', owner_name: 'Алишер Каримов', email: 'alisher@techwave.uz', category: 'Электроника' },
-  { id: 'sel_2', store_name: 'ModaUZ Trend', owner_name: 'Мадина Саидова', email: 'madina@modauz.com', category: 'Одежда и стиль' },
-];
-
-const fallbackUsers = [
-  { id: 'u_1', name: 'Дмитрий Петров', email: 'dima@mail.ru', role: 'customer', status: 'active' },
-  { id: 'u_2', name: 'Иван Иванов', email: 'ivan@gmail.com', role: 'seller', status: 'active' },
-  { id: 'u_3', name: 'Ботир Хакимов', email: 'botir_hater@mail.ru', role: 'customer', status: 'banned' },
-];
 
 const normalizeUser = (user) => {
   const fullName = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim();
@@ -46,14 +35,24 @@ export const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [activeTab, setActiveTab] = useState('sellers');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const stats = {
+    totalPlatformRevenue: 0,
+    totalSellers: users.filter((user) => user.role === 'seller').length,
+    totalUsers: users.length,
+    pendingVerifications: pendingSellers.length,
+  };
 
   useEffect(() => {
     const loadAdminData = async () => {
       setLoading(true);
+      setError('');
+
       try {
         const [usersResponse, sellersResponse] = await Promise.all([
-          apiClient.get('/admin/users').catch(() => ({ data: fallbackUsers })),
-          apiClient.get('/admin/products', { params: { status: 'pending' } }).catch(() => ({ data: fallbackPendingSellers })),
+          apiClient.get('/admin/users'),
+          apiClient.get('/admin/products', { params: { status: 'pending' } }),
         ]);
 
         const backendUsers = Array.isArray(usersResponse.data)
@@ -67,8 +66,9 @@ export const AdminDashboard = () => {
         setUsers(backendUsers.map(normalizeUser));
         setPendingSellers(backendSellers.map(normalizeSeller));
       } catch {
-        setUsers(fallbackUsers);
-        setPendingSellers(fallbackPendingSellers);
+        setUsers([]);
+        setPendingSellers([]);
+        setError('Нет данных с сервера. Проверьте авторизацию или подключение к API.');
       } finally {
         setLoading(false);
       }
@@ -122,13 +122,19 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Метрики маркетплейса */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white border rounded-xl p-5 shadow-sm flex items-center space-x-4">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><ShoppingBag size={22} /></div>
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Оборот маркетплейса</p>
-            <h3 className="text-xl font-bold text-gray-800">{mockAdminStats.totalPlatformRevenue.toLocaleString()} сум</h3>
+            <h3 className="text-xl font-bold text-gray-800">{stats.totalPlatformRevenue.toLocaleString()} сум</h3>
           </div>
         </div>
 
@@ -136,7 +142,7 @@ export const AdminDashboard = () => {
           <div className="p-3 bg-purple-50 text-purple-600 rounded-lg"><Users size={22} /></div>
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Всего продавцов</p>
-            <h3 className="text-xl font-bold text-gray-800">{mockAdminStats.totalSellers} доменов</h3>
+            <h3 className="text-xl font-bold text-gray-800">{stats.totalSellers} доменов</h3>
           </div>
         </div>
 
@@ -144,7 +150,7 @@ export const AdminDashboard = () => {
           <div className="p-3 bg-green-50 text-green-600 rounded-lg"><Users size={22} /></div>
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Зарегистрировано лиц</p>
-            <h3 className="text-xl font-bold text-gray-800">{mockAdminStats.totalUsers} акк.</h3>
+            <h3 className="text-xl font-bold text-gray-800">{stats.totalUsers} акк.</h3>
           </div>
         </div>
 
@@ -152,7 +158,7 @@ export const AdminDashboard = () => {
           <div className="p-3 bg-amber-50 text-amber-600 rounded-lg"><AlertTriangle size={22} /></div>
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Заявок на проверку</p>
-            <h3 className="text-xl font-bold text-amber-600">{pendingSellers.length} новых</h3>
+            <h3 className="text-xl font-bold text-amber-600">{stats.pendingVerifications} новых</h3>
           </div>
         </div>
       </div>
