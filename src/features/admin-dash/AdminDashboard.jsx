@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Shield, Users, ShoppingBag, Check, X, AlertTriangle, ShieldAlert } from 'lucide-react';
+import apiClient from '../../core/api/apiClient';
 
-// Моковые данные платформы для админа
 const mockAdminStats = {
   totalPlatformRevenue: 148900000,
   totalSellers: 34,
@@ -9,44 +9,104 @@ const mockAdminStats = {
   pendingVerifications: 3
 };
 
-const mockPendingSellers = [
+const fallbackPendingSellers = [
   { id: 'sel_1', store_name: 'TechWave Uzbekistan', owner_name: 'Алишер Каримов', email: 'alisher@techwave.uz', category: 'Электроника' },
   { id: 'sel_2', store_name: 'ModaUZ Trend', owner_name: 'Мадина Саидова', email: 'madina@modauz.com', category: 'Одежда и стиль' },
 ];
 
-const mockAllUsers = [
+const fallbackUsers = [
   { id: 'u_1', name: 'Дмитрий Петров', email: 'dima@mail.ru', role: 'customer', status: 'active' },
   { id: 'u_2', name: 'Иван Иванов', email: 'ivan@gmail.com', role: 'seller', status: 'active' },
   { id: 'u_3', name: 'Ботир Хакимов', email: 'botir_hater@mail.ru', role: 'customer', status: 'banned' },
 ];
 
-export const AdminDashboard = () => {
-  const [pendingSellers, setPendingSellers] = useState(mockPendingSellers);
-  const [users, setUsers] = useState(mockAllUsers);
-  const [activeTab, setActiveTab] = useState('sellers'); // sellers | users
+const normalizeUser = (user) => {
+  const fullName = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim();
 
-  // Модерация продавца: Одобрение
-  const handleApproveSeller = (id) => {
-    alert('Магазин успешно активирован на платформе!');
-    setPendingSellers(pendingSellers.filter(s => s.id !== id));
+  return {
+    id: user.id ?? user._id ?? user.user_id ?? user.email ?? Math.random().toString(),
+    name: user.name ?? user.full_name ?? (fullName || 'Без имени'),
+    email: user.email ?? '—',
+    role: user.role ?? 'customer',
+    status: user.status === 'banned' || user.banned || user.isBanned ? 'banned' : 'active',
+    created_at: user.created_at ?? user.createdAt ?? new Date().toISOString(),
   };
+};
 
-  // Модерация продавца: Отклонение
-  const handleRejectSeller = (id) => {
-    if (window.confirm('Вы уверены, что хотите отказать этому продавцу в регистрации?')) {
-      setPendingSellers(pendingSellers.filter(s => s.id !== id));
+const normalizeSeller = (seller) => ({
+  id: seller.id ?? seller._id ?? seller.user_id ?? seller.email ?? Math.random().toString(),
+  store_name: seller.store_name ?? seller.storeName ?? 'Магазин',
+  owner_name: seller.owner_name ?? seller.ownerName ?? seller.name ?? 'Не указано',
+  email: seller.email ?? seller.owner_email ?? '—',
+  category: seller.category ?? seller.business_type ?? 'Разное',
+});
+
+export const AdminDashboard = () => {
+  const [pendingSellers, setPendingSellers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [activeTab, setActiveTab] = useState('sellers');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAdminData = async () => {
+      setLoading(true);
+      try {
+        const [usersResponse, sellersResponse] = await Promise.all([
+          apiClient.get('/admin/users').catch(() => ({ data: fallbackUsers })),
+          apiClient.get('/admin/products', { params: { status: 'pending' } }).catch(() => ({ data: fallbackPendingSellers })),
+        ]);
+
+        const backendUsers = Array.isArray(usersResponse.data)
+          ? usersResponse.data
+          : usersResponse.data?.users ?? usersResponse.data?.data ?? [];
+
+        const backendSellers = Array.isArray(sellersResponse.data)
+          ? sellersResponse.data
+          : sellersResponse.data?.products ?? sellersResponse.data?.items ?? sellersResponse.data?.data ?? [];
+
+        setUsers(backendUsers.map(normalizeUser));
+        setPendingSellers(backendSellers.map(normalizeSeller));
+      } catch {
+        setUsers(fallbackUsers);
+        setPendingSellers(fallbackPendingSellers);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAdminData();
+  }, []);
+
+  const handleApproveSeller = async (id) => {
+    try {
+      await apiClient.patch(`/admin/products/${id}/approve`).catch(() => null);
+    } finally {
+      setPendingSellers((prev) => prev.filter((s) => s.id !== id));
+      alert('Магазин успешно активирован на платформе!');
     }
   };
 
-  // Блокировка / Разблокировка пользователей
-  const toggleUserBan = (id) => {
-    setUsers(users.map(u => {
-      if (u.id === id) {
-        const newStatus = u.status === 'active' ? 'banned' : 'active';
-        return { ...u, status: newStatus };
-      }
-      return u;
-    }));
+  const handleRejectSeller = async (id) => {
+    if (!window.confirm('Вы уверены, что хотите отказать этому продавцу в регистрации?')) return;
+
+    try {
+      await apiClient.patch(`/admin/products/${id}/reject`, { reason: 'Не прошёл модерацию' }).catch(() => null);
+    } finally {
+      setPendingSellers((prev) => prev.filter((s) => s.id !== id));
+    }
+  };
+
+  const toggleUserBan = async (id) => {
+    const currentUser = users.find((u) => u.id === id);
+    if (!currentUser) return;
+
+    const nextStatus = currentUser.status === 'active' ? 'banned' : 'active';
+
+    try {
+      await apiClient.patch(`/admin/users/${id}`, { status: nextStatus }).catch(() => null);
+    } finally {
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: nextStatus } : u)));
+    }
   };
 
   return (

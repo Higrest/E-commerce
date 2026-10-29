@@ -9,9 +9,12 @@ export const ProtectedRoute = ({ allowedRoles }) => {
     return <Navigate to="/auth/login" replace />;
   }
 
-  // Если роль пользователя не входит в массив разрешенных ролей для этой страницы
-  if (user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />; // Или на страницу 403 / Forbidden
+  if (!user) {
+    return <Navigate to="/auth/login" replace />;
+  }
+
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

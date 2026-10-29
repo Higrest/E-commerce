@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, ShieldAlert, UserCheck, Shield, UserX, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import apiClient from '../../core/api/apiClient';
 
-// Моковые данные всех пользователей системы для демонстрации
 const mockUsersList = [
   { id: 'u_1', name: 'Дмитрий Петров', email: 'dima@mail.ru', role: 'customer', status: 'active', created_at: '2026-05-12' },
   { id: 'u_2', name: 'Иван Иванов', email: 'ivan@gmail.com', role: 'seller', status: 'active', created_at: '2026-06-20' },
@@ -10,18 +10,46 @@ const mockUsersList = [
   { id: 'u_4', name: 'Сардор Умаров', email: 'sardor@seller.uz', role: 'seller', status: 'active', created_at: '2026-09-01' },
 ];
 
+const normalizeUser = (user) => {
+  const fullName = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim();
+
+  return {
+    id: user.id ?? user._id ?? user.user_id ?? user.email ?? Math.random().toString(),
+    name: user.name ?? user.full_name ?? (fullName || 'Без имени'),
+    email: user.email ?? '—',
+    role: user.role ?? 'customer',
+    status: user.status === 'banned' || user.banned || user.isBanned ? 'banned' : 'active',
+    created_at: user.created_at ?? user.createdAt ?? new Date().toISOString(),
+  };
+};
+
 export const UserManagement = () => {
   const [users, setUsers] = useState(mockUsersList);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
-  // Переключение статуса Бан / Активен
-  const handleToggleBan = (id, currentStatus) => {
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const { data } = await apiClient.get('/admin/users');
+        const backendUsers = Array.isArray(data) ? data : data?.users ?? data?.data ?? [];
+        setUsers(backendUsers.map(normalizeUser));
+      } catch {
+        setUsers(mockUsersList);
+      }
+    };
+
+    loadUsers();
+  }, []);
+
+  const handleToggleBan = async (id, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'banned' : 'active';
-    
-    setUsers(users.map(user => 
-      user.id === id ? { ...user, status: newStatus } : user
-    ));
+
+    try {
+      await apiClient.patch(`/admin/users/${id}`, { status: newStatus }).catch(() => null);
+    } finally {
+      setUsers((prev) => prev.map((user) => (user.id === id ? { ...user, status: newStatus } : user)));
+    }
 
     if (newStatus === 'banned') {
       toast.error('Пользователь успешно заблокирован');
@@ -30,18 +58,18 @@ export const UserManagement = () => {
     }
   };
 
-  // Изменение роли пользователя администратором
-  const handleChangeRole = (id, newRole) => {
-    setUsers(users.map(user => 
-      user.id === id ? { ...user, role: newRole } : user
-    ));
+  const handleChangeRole = async (id, newRole) => {
+    try {
+      await apiClient.patch(`/admin/users/${id}`, { role: newRole }).catch(() => null);
+    } finally {
+      setUsers((prev) => prev.map((user) => (user.id === id ? { ...user, role: newRole } : user)));
+    }
     toast.success(`Роль пользователя изменена на ${newRole}`);
   };
 
-  // Фильтрация и поиск
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          user.email.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });

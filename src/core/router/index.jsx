@@ -12,7 +12,7 @@ import { OrderTracking } from '../../features/orders/OrderTracking';
 import { SellerDashboard } from '../../features/seller-dash/SellerDashboard';
 import { ManageProducts } from '../../features/seller-dash/ManageProducts';
 import { AdminDashboard } from '../../features/admin-dash/AdminDashboard';
-
+import ProductApprovals from '../../features/admin-dash/ProductApprovals';
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
       { path: 'product/:id', element: <ProductDetail /> },
       { path: 'auth/login', element: <Login /> },
       { path: 'auth/register', element: <Register /> },
-      
+      { path: '/admin/products', element: <ProductApprovals /> },
       // Защищенные страницы покупателя (Customer)
       {
         element: <ProtectedRoute allowedRoles={['customer']} />,
