@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useCartStore } from '../../core/store/cartStore';
+import { useFavoritesStore } from '../../core/store/favoritesStore';
 import { useAuthStore } from '../../core/store/authStore';
 import { useUiStore } from '../../core/store/uiStore';
-import { ShoppingCart, Star, ArrowLeft, ShieldCheck, MessageSquare } from 'lucide-react';
+import { ShoppingCart, Star, ArrowLeft, ShieldCheck, MessageSquare, Heart } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const mockProductDataByLanguage = {
@@ -155,6 +156,9 @@ const translations = {
 export const ProductDetail = () => {
   const { id } = useParams();
   const addToCart = useCartStore((state) => state.addToCart);
+  const cartItems = useCartStore((state) => state.cartItems);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+  const isFavorite = useFavoritesStore((state) => state.isFavorite);
   const { user } = useAuthStore();
   const { language } = useUiStore();
   const t = translations[language] || translations.ru;
@@ -168,6 +172,10 @@ export const ProductDetail = () => {
     const currentProduct = mockProductDataByLanguage[language]?.product || mockProductDataByLanguage.ru.product;
     setProduct(currentProduct);
   }, [language]);
+
+  const productInCart = cartItems.find((item) => item.product_id === product.id);
+  const cartQuantity = productInCart ? productInCart.quantity : 0;
+  const liked = isFavorite(product.id);
 
   const handleAddToCart = () => {
     const success = addToCart(product, quantity);
@@ -239,7 +247,18 @@ export const ProductDetail = () => {
               <span className="font-bold text-gray-800">{product.stock_quantity} {t.pieces}</span>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => toggleFavorite(product)}
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl border text-sm font-semibold transition-all ${
+                  liked ? 'bg-pink-500 text-white border-pink-500' : 'bg-white text-gray-700 border-gray-200 hover:border-pink-300 hover:text-pink-500'
+                }`}
+              >
+                <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+                <span>{liked ? 'В избранном' : 'В избранное'}</span>
+              </button>
+
               <div className="flex items-center border rounded-xl bg-white p-1">
                 <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-3 py-1 font-bold text-gray-500 hover:text-gray-800">-</button>
                 <span className="w-8 text-center text-sm font-bold text-gray-800">{quantity}</span>
@@ -248,10 +267,14 @@ export const ProductDetail = () => {
 
               <button
                 onClick={handleAddToCart}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-md shadow-blue-100 flex items-center justify-center space-x-2 text-sm"
+                className={`flex-1 font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center space-x-2 text-sm ${
+                  cartQuantity > 0
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-100'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100'
+                }`}
               >
                 <ShoppingCart size={18} />
-                <span>{t.addToCart}</span>
+                <span>{cartQuantity > 0 ? `В корзине (${cartQuantity})` : t.addToCart}</span>
               </button>
             </div>
           </div>

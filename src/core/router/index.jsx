@@ -5,6 +5,7 @@ import { Layout } from '../../components/Layout';
 import { ProductList } from '../../features/catalog/ProductList';
 import { ProductDetail } from '../../features/catalog/ProductDetail';
 import { CartPage } from '../../features/cart/CartPage';
+import { FavoritesPage } from '../../features/favorites/FavoritesPage';
 import { Login } from '../../features/auth/Login';
 import { Register } from '../../features/auth/Register';
 import { OrderHistory } from '../../features/orders/OrderHistory';
@@ -23,10 +24,11 @@ export const router = createBrowserRouter([
       { path: 'product/:id', element: <ProductDetail /> },
       { path: 'auth/login', element: <Login /> },
       { path: 'auth/register', element: <Register /> },
+      { path: 'favorites', element: <FavoritesPage /> },
       { path: '/admin/products', element: <ProductApprovals /> },
       // Защищенные страницы покупателя (Customer)
       {
-        element: <ProtectedRoute allowedRoles={['customer']} />,
+        element: <ProtectedRoute allowedRoles={['customer', 'user']} />,
         children: [
           { path: 'cart', element: <CartPage /> },
           { path: 'orders/history', element: <OrderHistory /> },

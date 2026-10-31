@@ -109,6 +109,21 @@ export const AdminDashboard = () => {
     }
   };
 
+  const handleRemoveUser = async (id) => {
+    const targetUser = users.find((u) => u.id === id);
+    if (!targetUser || targetUser.role === 'admin') return;
+
+    const confirmed = window.confirm(`Удалить пользователя ${targetUser.name}?`);
+    if (!confirmed) return;
+
+    try {
+      await apiClient.delete(`/admin/users/${id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Не удалось удалить пользователя');
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 bg-gray-50 min-h-screen">
       {/* Шапка */}
@@ -223,7 +238,7 @@ export const AdminDashboard = () => {
                 <th className="p-4">Имя / Email</th>
                 <th className="p-4">Роль</th>
                 <th className="p-4">Статус</th>
-                <th className="p-4 text-right">Модерация аккаунта</th>
+                <th className="p-4 text-right">Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y text-sm text-gray-700">
@@ -241,14 +256,22 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="p-4 text-right">
                     {user.role !== 'admin' && (
-                      <button
-                        onClick={() => toggleUserBan(user.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center space-x-1 ml-auto transition-colors
-                          ${user.status === 'active' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
-                      >
-                        <ShieldAlert size={14} />
-                        <span>{user.status === 'active' ? 'Заблокировать' : 'Разблокировать'}</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => toggleUserBan(user.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center space-x-1 transition-colors
+                            ${user.status === 'active' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
+                        >
+                          <ShieldAlert size={14} />
+                          <span>{user.status === 'active' ? 'Заблокировать' : 'Разблокировать'}</span>
+                        </button>
+                        <button
+                          onClick={() => handleRemoveUser(user.id)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          Удалить
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

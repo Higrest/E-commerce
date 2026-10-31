@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../core/store/authStore';
 import { useCartStore } from '../core/store/cartStore';
+import { useFavoritesStore } from '../core/store/favoritesStore';
 import { useUiStore } from '../core/store/uiStore';
-import { ShoppingCart, LogOut, Store, Shield, ShoppingBag, SunMedium, MoonStar } from 'lucide-react';
+import { apiClient } from '../core/api/apiClient';
+import { ShoppingCart, LogOut, Store, Shield, ShoppingBag, SunMedium, MoonStar, Heart } from 'lucide-react';
 
 const translations = {
   ru: {
@@ -43,13 +45,14 @@ const translations = {
 export const Layout = () => {
   const { user, logout, token, login } = useAuthStore();
   const cartItems = useCartStore((state) => state.cartItems);
+  const favoriteItems = useFavoritesStore((state) => state.favoriteItems);
   const { theme, language, setTheme, setLanguage } = useUiStore();
   const navigate = useNavigate();
   const [adminSequence, setAdminSequence] = useState({ step: 0, rightsClicks: 0 });
 
   const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
 
-  const handleAdminEasterEgg = (word) => {
+  const handleAdminEasterEgg = async (word) => {
     const normalized = String(word).trim().toUpperCase();
 
     if (normalized === 'ВСЕ') {
@@ -77,17 +80,28 @@ export const Layout = () => {
 
     if (normalized === 'ЗАЩИЩЕНЫ') {
       if (adminSequence.step === 2) {
-        login(
-          {
-            id: 'admin-demo',
-            name: 'Admin',
+        try {
+          const response = await apiClient.post('/auth/login', {
             email: 'admin@admin.com',
-            role: 'admin',
-          },
-          'admin-demo-token'
-        );
-        navigate('/admin/dashboard');
-        setAdminSequence({ step: 0, rightsClicks: 0 });
+            password: 'admin123',
+          });
+
+          const payload = response.data || {};
+          const user = payload.data?.user || payload.user;
+          const token = payload.token || payload.data?.token;
+
+          if (!user || !token) {
+            throw new Error('No user or token in response');
+          }
+
+          login(user, token);
+          navigate('/admin/dashboard');
+          setAdminSequence({ step: 0, rightsClicks: 0 });
+        } catch (error) {
+          console.error('Admin login failed:', error);
+          alert('Не удалось войти в админский аккаунт. Проверьте сервер и базу данных.');
+          setAdminSequence({ step: 0, rightsClicks: 0 });
+        }
       } else {
         setAdminSequence({ step: 0, rightsClicks: 0 });
       }
@@ -116,7 +130,27 @@ export const Layout = () => {
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-100 p-1 dark:border-slate-700 dark:bg-slate-800">
+            <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-100 p-1 dark:border-slate-700 dark:bg-slate-800 order-1">
+              <Link to={token && user ? '/cart' : '/auth/login'} className="relative p-2 text-gray-600 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 transition-colors">
+                <ShoppingCart size={20} />
+                {cartItems.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white">
+                    {cartItems.reduce((acc, item) => acc + item.quantity, 0)}
+                  </span>
+                )}
+              </Link>
+
+              <Link to={token && user ? '/favorites' : '/auth/login'} className="relative p-2 text-gray-600 hover:text-pink-600 dark:text-slate-300 dark:hover:text-pink-400 transition-colors">
+                <Heart size={20} className="fill-current" />
+                {favoriteItems.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white">
+                    {favoriteItems.length}
+                  </span>
+                )}
+              </Link>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-100 p-1 dark:border-slate-700 dark:bg-slate-800 order-2">
               <button type="button" title="Light theme" onClick={() => setTheme('light')} className={`p-2 rounded-lg transition-colors ${theme === 'light' ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-gray-500 hover:text-gray-800 dark:text-slate-300 dark:hover:text-white'}`}>
                 <SunMedium size={16} />
               </button>
@@ -125,7 +159,7 @@ export const Layout = () => {
               </button>
             </div>
 
-            <div className="flex items-center rounded-xl border border-gray-200 bg-gray-100 p-1 dark:border-slate-700 dark:bg-slate-800">
+            <div className="flex items-center rounded-xl border border-gray-200 bg-gray-100 p-1 dark:border-slate-700 dark:bg-slate-800 order-3">
               {['ru', 'en', 'kk', 'uz'].map((code) => (
                 <button
                   key={code}
@@ -139,22 +173,12 @@ export const Layout = () => {
             </div>
 
             {token && user ? (
-              <div className="flex items-center space-x-4">
-                {user.role === 'customer' && (
-                  <>
-                    <Link to="/orders/history" className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 flex items-center space-x-1">
-                      <ShoppingBag size={18} />
-                      <span className="hidden sm:inline">{t.myOrders}</span>
-                    </Link>
-                    <Link to="/cart" className="relative p-2 text-gray-600 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 transition-colors">
-                      <ShoppingCart size={22} />
-                      {cartItems.length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white">
-                          {cartItems.reduce((acc, item) => acc + item.quantity, 0)}
-                        </span>
-                      )}
-                    </Link>
-                  </>
+              <div className="flex items-center space-x-4 order-4">
+                {(user.role === 'customer' || user.role === 'user') && (
+                  <Link to="/orders/history" className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 flex items-center space-x-1">
+                    <ShoppingBag size={18} />
+                    <span className="hidden sm:inline">{t.myOrders}</span>
+                  </Link>
                 )}
 
                 {user.role === 'seller' && (
@@ -182,9 +206,11 @@ export const Layout = () => {
                 </div>
               </div>
             ) : (
-              <Link to="/auth/login" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
-                {t.login}
-              </Link>
+              <div className="order-4">
+                <Link to="/auth/login" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+                  {t.login}
+                </Link>
+              </div>
             )}
           </div>
         </div>

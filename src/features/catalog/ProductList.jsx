@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useCartStore } from '../../core/store/cartStore';
+import { useFavoritesStore } from '../../core/store/favoritesStore';
 import { useUiStore } from '../../core/store/uiStore';
-import { Search, SlidersHorizontal, ShoppingCart, Star } from 'lucide-react';
+import { Search, SlidersHorizontal, ShoppingCart, Star, Heart } from 'lucide-react';
 import keyboard from '../../assets/rgb клава.webp';
 import watch from '../../assets/часы.JPG';
 import headphones from '../../assets/Наушники.jpg';
@@ -104,6 +105,9 @@ const mockCatalogProductsByLanguage = {
 
 export const ProductList = () => {
   const addToCart = useCartStore((state) => state.addToCart);
+  const cartItems = useCartStore((state) => state.cartItems);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+  const isFavorite = useFavoritesStore((state) => state.isFavorite);
   const { language } = useUiStore();
   const t = translations[language] || translations.ru;
   const catalogProducts = mockCatalogProductsByLanguage[language] || mockCatalogProductsByLanguage.ru;
@@ -181,47 +185,67 @@ export const ProductList = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <div key={product.id} className="bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group flex flex-col">
-              <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <span className="absolute top-3 left-3 bg-white/95 text-gray-700 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider shadow-sm">
-                  {product.category}
-                </span>
-              </div>
+          {filteredProducts.map((product) => {
+            const currentProductInCart = cartItems.find((item) => item.product_id === product.id);
+            const cartQuantity = currentProductInCart ? currentProductInCart.quantity : 0;
+            const liked = isFavorite(product.id);
 
-              <div className="p-4 flex flex-col flex-1 space-y-2">
-                <div className="flex justify-between items-center text-xs text-gray-400">
-                  <div className="flex items-center space-x-1 text-amber-500 font-medium">
-                    <Star size={14} fill="currentColor" />
-                    <span>{product.rating}</span>
-                  </div>
-                  <span>{t.stock}: {product.stock_quantity} шт.</span>
-                </div>
-
-                <h3 className="font-semibold text-gray-800 text-sm line-clamp-2 min-h-[40px] group-hover:text-blue-600 transition-colors">
-                  {product.name}
-                </h3>
-
-                <div className="flex items-center justify-between pt-2 mt-auto">
-                  <span className="text-base font-bold text-gray-900">
-                    {product.price.toLocaleString()} {t.sum}
+            return (
+              <div key={product.id} className="bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group flex flex-col">
+                <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <span className="absolute top-3 left-3 bg-white/95 text-gray-700 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider shadow-sm">
+                    {product.category}
                   </span>
                   <button
-                    onClick={() => addToCart(product)}
-                    className="p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all shadow-sm"
-                    title={t.addToCart}
+                    type="button"
+                    onClick={() => toggleFavorite(product)}
+                    className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm transition-all ${liked ? 'bg-pink-500 text-white shadow-lg' : 'bg-white/90 text-gray-600 hover:text-pink-500 hover:bg-white'}`}
+                    aria-label={liked ? 'Убрать из избранного' : 'Добавить в избранное'}
                   >
-                    <ShoppingCart size={16} />
+                    <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
                   </button>
                 </div>
+
+                <div className="p-4 flex flex-col flex-1 space-y-2">
+                  <div className="flex justify-between items-center text-xs text-gray-400">
+                    <div className="flex items-center space-x-1 text-amber-500 font-medium">
+                      <Star size={14} fill="currentColor" />
+                      <span>{product.rating}</span>
+                    </div>
+                    <span>{t.stock}: {product.stock_quantity} шт.</span>
+                  </div>
+
+                  <h3 className="font-semibold text-gray-800 text-sm line-clamp-2 min-h-[40px] group-hover:text-blue-600 transition-colors">
+                    {product.name}
+                  </h3>
+
+                  <div className="flex items-center justify-between pt-2 mt-auto gap-2">
+                    <span className="text-base font-bold text-gray-900">
+                      {product.price.toLocaleString()} {t.sum}
+                    </span>
+
+                    <button
+                      onClick={() => addToCart(product)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                        cartQuantity > 0
+                          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                          : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
+                      }`}
+                      title={cartQuantity > 0 ? 'Товар уже в корзине' : t.addToCart}
+                    >
+                      <ShoppingCart size={14} />
+                      <span>{cartQuantity > 0 ? `В корзине (${cartQuantity})` : t.addToCart}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
